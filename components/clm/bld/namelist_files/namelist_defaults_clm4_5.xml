@@ -1763,6 +1763,13 @@ this mask will have smb calculated over the entire global land surface
 <pflotran_prefix>pflotran_clm</pflotran_prefix>
 
 <!-- =========================================  -->
+<!-- Defaults for clm_parflow_inparm interface -->
+<!-- =========================================  -->
+<parflow_inputdir>parflow</parflow_inputdir>
+<parflow_prefix>parflow_clm</parflow_prefix>
+<pf_elm_mapfile>mapping.txt</pf_elm_mapfile>
+
+<!-- =========================================  -->
 <!-- Defaults for FATES interface -->
 <!-- =========================================  -->
 <use_fates_spitfire            use_fates=".true.">.false.</use_fates_spitfire>
