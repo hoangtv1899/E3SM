@@ -11,6 +11,7 @@ module clm_driver
   use shr_kind_mod           , only : r8 => shr_kind_r8
   use shr_sys_mod            , only : shr_sys_flush
   use shr_log_mod            , only : errMsg => shr_log_errMsg
+  use clm_varctl             , only : use_parflow_via_emi
   use clm_varctl             , only : wrtdia, iulog, create_glacier_mec_landunit, use_fates
   use clm_varpar             , only : nlevtrc_soil, nlevsoi
   use clm_varctl             , only : wrtdia, iulog, create_glacier_mec_landunit, use_fates, use_betr  
@@ -1245,20 +1246,22 @@ contains
           end if
        end if
 
-       call t_startf('balchk')
-       call ColWaterBalanceCheck(bounds_clump, &
-            filter(nc)%num_do_smb_c, filter(nc)%do_smb_c, &
-            atm2lnd_vars, glc2lnd_vars, solarabs_vars, waterflux_vars, &
-            waterstate_vars, energyflux_vars, canopystate_vars)
-       call t_stopf('balchk')
+       if (.not.use_parflow_via_emi) then
+          call t_startf('balchk')
+          call ColWaterBalanceCheck(bounds_clump, &
+               filter(nc)%num_do_smb_c, filter(nc)%do_smb_c, &
+               atm2lnd_vars, glc2lnd_vars, solarabs_vars, waterflux_vars, &
+               waterstate_vars, energyflux_vars, canopystate_vars)
+          call t_stopf('balchk')
 
-       call t_startf('gridbalchk')
-       call GridBalanceCheck(bounds_clump                             , &
-            filter(nc)%num_do_smb_c, filter(nc)%do_smb_c              , &
-            atm2lnd_vars, glc2lnd_vars, solarabs_vars, waterflux_vars , &
-            waterstate_vars, energyflux_vars, canopystate_vars        , &
-            soilhydrology_vars)
-       call t_stopf('gridbalchk')
+          call t_startf('gridbalchk')
+          call GridBalanceCheck(bounds_clump                             , &
+               filter(nc)%num_do_smb_c, filter(nc)%do_smb_c              , &
+               atm2lnd_vars, glc2lnd_vars, solarabs_vars, waterflux_vars , &
+               waterstate_vars, energyflux_vars, canopystate_vars        , &
+               soilhydrology_vars)
+          call t_stopf('gridbalchk')
+       end if
 
        call WaterBudget_SetEndingMonthlyStates(bounds_clump, waterstate_vars)
 

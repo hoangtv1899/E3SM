@@ -976,6 +976,7 @@ contains
     use clm_varctl               , only : vsfm_include_seepage_bc, vsfm_satfunc_type
     use clm_varctl               , only : vsfm_lateral_model_type
     use clm_varctl               , only : use_petsc_thermal_model
+    use clm_varctl               , only : use_parflow_via_emi
     use clm_varctl               , only : lateral_connectivity
     use clm_varctl               , only : finidat
     use decompMod                , only : get_proc_clumps
@@ -986,14 +987,19 @@ contains
     use mpp_varctl               , only : mpp_varctl_init_petsc_thermal
     use mpp_bounds               , only : mpp_bounds_init_proc_bounds
     use mpp_bounds               , only : mpp_bounds_init_clump
-    use ExternalModelInterfaceMod, only : EMI_Init_EM
+    use ExternalModelInterfaceMod, only : EMI_Init_EM, EMI_ReadNameList_For_PARFLOW, EMI_Set_Restart_Stamp
     use ExternalModelConstants   , only : EM_ID_VSFM
     use ExternalModelConstants   , only : EM_ID_PTM
+    use ExternalModelConstants   , only : EM_ID_PARFLOW
+    use controlMod               , only : NLFilename
+    use restFileMod              , only : restFile_getfile
 
     implicit none
 
     type(bounds_type) :: bounds_proc
     logical           :: restart_vsfm          ! does VSFM need to be restarted
+    character(len=256)    :: fnamer       ! name of netcdf restart file 
+    character(len=256)    :: pnamer       ! full pathname of netcdf restart file
 
     call t_startf('clm_init3')
 
@@ -1037,6 +1043,16 @@ contains
 
     if (use_petsc_thermal_model) then
        call EMI_Init_EM(EM_ID_PTM)
+    endif
+
+    if (use_parflow_via_emi) then
+       call EMI_ReadNameList_For_PARFLOW(NLFilename)
+       if (nsrest /= nsrStartup) then
+          call restFile_getfile(file=fnamer, path=pnamer)
+          call EMI_Set_Restart_Stamp(fnamer)
+       end if
+
+       call EMI_Init_EM(EM_ID_PARFLOW)
     endif
 
     call t_stopf('clm_init3')

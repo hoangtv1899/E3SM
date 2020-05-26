@@ -354,6 +354,8 @@ module clm_varctl
   ! PETSc-based thermal model switches
   !----------------------------------------------------------
   logical, public :: use_petsc_thermal_model = .false.
+  !
+  logical           , public :: use_parflow_via_emi = .false.
 
   !----------------------------------------------------------
   ! Stub EM switches

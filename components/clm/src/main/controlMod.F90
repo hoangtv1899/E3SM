@@ -279,6 +279,8 @@ contains
     namelist /clm_inparm / &
          use_vsfm, vsfm_satfunc_type, vsfm_use_dynamic_linesearch, &
          vsfm_lateral_model_type, vsfm_include_seepage_bc
+    namelist /clm_inparm / &
+         use_parflow_via_emi
 
     namelist /clm_inparm/ use_hydrstress
 
@@ -817,6 +819,8 @@ contains
     ! soil erosion
     call mpi_bcast (use_erosion, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (ero_ccycle , 1, MPI_LOGICAL, 0, mpicom, ier)
+    ! ELM-PARFLOW coupling
+    call mpi_bcast (use_parflow_via_emi, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     ! Budget
     call mpi_bcast (do_budgets   , 1, MPI_LOGICAL, 0, mpicom, ier)
