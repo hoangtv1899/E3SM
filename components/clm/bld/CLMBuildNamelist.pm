@@ -2025,6 +2025,10 @@ sub process_namelist_inline_logic {
   #########################################
   setup_logic_pflotran($opts, $nl_flags, $definition, $defaults, $nl, $physv);
 
+  #########################################
+  # namelist group: clm_parflow_inparm   #
+  #########################################
+  setup_logic_parflow($opts, $nl_flags, $definition, $defaults, $nl, $physv);
 }
 
 #-------------------------------------------------------------------------------
@@ -3336,6 +3340,35 @@ sub setup_logic_pflotran {
 } # end setup_logic_pflotran
 
 #-------------------------------------------------------------------------------
+sub setup_logic_parflow {
+    # clm_arflown_inparm
+    # PARFLOW model
+    #
+    my ($test_files, $nl_flags, $definition, $defaults, $nl, $physv) = @_;
+
+    if ( $physv->as_long() >= $physv->as_long("clm4_5")) {
+
+      if ( $nl_flags->{'use_parflow'}  eq '.true.' ) {
+        add_default($test_files, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'parflow_inputdir' );
+        add_default($test_files, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'parflow_prefix' );
+        #
+        # Check if $parflow_prefix is set in $inputdata_rootdir/$parflow      #
+        my $parflow_inputdir = $nl->get_value('parflow_inputdir');
+        my $parflow_prefix = $nl->get_value('parflow_prefix');
+
+                            print "OK -- found parflow $parflow_prefix\n";
+        add_default($test_files, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'parflow_inputdir' );
+        add_default($test_files, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'pf_elm_mapfile' );
+        #
+        # Check if $parflow_prefix is set in $inputdata_rootdir/$parflow      #
+        my $parflow_inputdir = $nl->get_value('parflow_inputdir');
+        my $pf_elm_mapfile = $nl->get_value('pf_elm_mapfile');
+                            print "OK -- found mapfile $pf_elm_mapfile\n";
+             # (TODO) something here, but not yet at this momment.
+      }
+    }
+} # end setup_logic_parflow
+#-------------------------------------------------------------------------------
 
 sub setup_logic_fates {
     #
@@ -3385,7 +3418,7 @@ sub write_output_files {
   } else {
     @groups = qw(clm_inparm ndepdyn_nml pdepdyn_nml popd_streams light_streams lai_streams clm_canopyhydrology_inparm 
                  clm_soilhydrology_inparm dynamic_subgrid finidat_consistency_checks dynpft_consistency_checks 
-                 clmu_inparm clm_soilstate_inparm clm_pflotran_inparm betr_inparm);
+                 clmu_inparm clm_soilstate_inparm clm_pflotran_inparm clm_parflow_inparm betr_inparm);
     #@groups = qw(clm_inparm clm_canopyhydrology_inparm clm_soilhydrology_inparm 
     #             finidat_consistency_checks dynpft_consistency_checks);
     # Eventually only list namelists that are actually used when CN on

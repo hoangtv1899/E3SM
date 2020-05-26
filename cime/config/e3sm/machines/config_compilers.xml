@@ -1128,16 +1128,19 @@ flags should be captured within MPAS CMake files.
   </CONFIG_ARGS>
   <CPPDEFS>
     <append> -DLINUX </append>
+    <append> -DELM_PARFLOW -DUSE_PETSC_LIB </append>
   </CPPDEFS>
   <FFLAGS>
     <append DEBUG="FALSE"> -O2 </append>
     <append DEBUG="TRUE"> -g -traceback  -O0 -fpe0 -check  all -check noarg_temp_created -ftrapuv -init=snan</append>
+    <append> -I/qfs/people/d3m045/software/petsc-3.9.3/include </append>
+    <append> -I/qfs/people/d3m045/software/petsc-3.9.3/arch-linux2-c-debug/include </append>
   </FFLAGS>
   <NETCDF_PATH>$ENV{NETCDF_HOME}</NETCDF_PATH>
   <PNETCDF_PATH>$ENV{PNETCDF_HOME}</PNETCDF_PATH>
   <PIO_FILESYSTEM_HINTS>lustre</PIO_FILESYSTEM_HINTS>
   <SLIBS>
-    <base> -lpmi -L$NETCDF_PATH/lib -lnetcdf -lnetcdff -L$ENV{MKL_PATH}/lib/intel64/ -lmkl_rt $ENV{PNETCDF_LIBRARIES}</base>
+    <base> -lpmi -L$NETCDF_PATH/lib -lnetcdf -lnetcdff -L$ENV{MKL_PATH}/lib/intel64/ -lmkl_rt $ENV{PNETCDF_LIBRARIES} </base>
   </SLIBS>
   <MPICC  MPILIB="impi">mpiicc</MPICC>
   <MPICXX MPILIB="impi">mpiicpc</MPICXX>
