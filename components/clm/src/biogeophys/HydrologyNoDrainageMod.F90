@@ -237,14 +237,21 @@ contains
                                                       soilstate_vars, waterflux_vars)
 
       !------------------------------------------------------------------------------------
-      if (use_pflotran .and. pf_hmode) then
+!      if ( use_parflow_via_emi ) then
+!         call parflow_run( DTBL*grid%parflow_subcycle,  &
+!                      curr_secs, ims,ime,jms,jme,i_start(1),i_end(1),          &
+!                      j_start(1),j_end(1), num_soil_layers,                    &
+!                      grid%PF_FLUX, grid%PF_PRESSURE, grid%PF_POROSITY,
+!                      grid%PF_SATURATION)
+!      else
+       if (use_pflotran .and. pf_hmode) then
 
         call SoilWater(bounds, num_hydrononsoic, filter_hydrononsoic, &
             num_urbanc, filter_urbanc, &
             soilhydrology_vars, soilstate_vars, waterflux_vars, waterstate_vars, temperature_vars, &
             soil_water_retention_curve)
 
-      else
+       else
       !------------------------------------------------------------------------------------
 
         call SoilWater(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
@@ -252,7 +259,8 @@ contains
             soil_water_retention_curve)
 
       !------------------------------------------------------------------------------------
-      end if
+       end if
+!      end if
       !------------------------------------------------------------------------------------
 
             
