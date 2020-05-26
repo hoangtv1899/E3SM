@@ -1,0 +1,176 @@
+module pflotran_model_module
+#ifdef USE_PETSC_LIB
+
+#include "petsc/finclude/petscsys.h"
+#include "petsc/finclude/petscvec.h"
+#include "petsc/finclude/petscviewer.h"
+
+  use abortutils                   , only : endrun
+  use shr_kind_mod                 , only : r8 => shr_kind_r8
+  use shr_log_mod                  , only : errMsg => shr_log_errMsg
+  use EMI_DataMod                  , only : emi_data_list, emi_data
+  use clm_varctl                   , only : iulog
+  use ExternalModelBaseType        , only : em_base_type
+  use MultiPhysicsProbVSFM         , only : mpp_vsfm_type
+  use decompMod                    , only : bounds_type
+  use ExternalModelConstants
+  use EMI_Atm2LndType_Constants
+  use EMI_CanopyStateType_Constants
+  use EMI_ColumnType_Constants
+  use EMI_EnergyFluxType_Constants
+  use EMI_Filter_Constants
+  use EMI_Landunit_Constants
+  use EMI_SoilHydrologyType_Constants
+  use EMI_SoilStateType_Constants
+  use EMI_TemperatureType_Constants
+  use EMI_WaterFluxType_Constants
+  use EMI_WaterStateType_Constants
+  use clm_parflow_interface_data
+  !
+  implicit none
+  !
+  ! Note:
+  !
+  ! CLM has the following:
+  !   (i) 3D subsurface grid (CLM_SUB);
+  !   (ii) 2D surface grid (CLM_SRF).
+  ! CLM decomposes the 3D subsurface grid across processors in a 2D (i.e.
+  ! cells in Z are not split across processors). Thus, the surface cells of
+  ! 3D subsurface grid are on the same processors as the 2D surface grid.
+  !
+  ! PFLOTRAN has the following:
+  !   (i) 3D subsurface grid (PF_SUB);
+  !   (ii) surface control volumes of 3D subsurface grid (PF_2DSUB);
+  !   (iii) 2D surface grid (PF_SRF).
+  ! In PFLOTRAN, control volumes in PF_2DSUB and PF_SRF may reside on different
+  ! processors. PF_SUB and PF_2DSUB are derived from simulation%realization;
+  ! while PF_SRF refers to simulation%surf_realization.
+
+  ! map level constants
+  PetscInt, parameter, public :: CLM_SUB_TO_PF_SUB           = 1 ! 3D --> 3D
+  PetscInt, parameter, public :: CLM_SUB_TO_PF_EXTENDED_SUB  = 2 ! 3D -->extended 3D
+  PetscInt, parameter, public :: CLM_SRF_TO_PF_2DSUB         = 3 ! 2D --> SURF of 3D grid
+  PetscInt, parameter, public :: CLM_SRF_TO_PF_SRF           = 4 ! 2D --> 2D SURF grid
+  PetscInt, parameter, public :: PF_SUB_TO_CLM_SUB           = 5 ! 3D --> 3D 
+  PetscInt, parameter, public :: PF_SRF_TO_CLM_SRF           = 6 ! 2D SURF grid --> 2D
+
+  ! mesh ids
+  PetscInt, parameter, public :: CLM_SUB_MESH   = 1
+  PetscInt, parameter, public :: CLM_SRF_MESH   = 2
+  PetscInt, parameter, public :: PF_SUB_MESH    = 3
+  PetscInt, parameter, public :: PF_2DSUB_MESH  = 4
+  PetscInt, parameter, public :: PF_SRF_MESH    = 5
+  type, public :: parflow_model_type
+    type(inside_each_overlapped_cell), pointer :: pf_cells(:)
+    type(inside_each_overlapped_cell), pointer :: clm_cells(:)
+    type(mapping_type),                pointer :: map_clm_sub_to_pf_sub
+    type(mapping_type),                pointer :: map_clm_sub_to_pf_extended_sub
+    type(mapping_type),                pointer :: map_clm_srf_to_pf_2dsub
+    type(mapping_type),                pointer :: map_clm_srf_to_pf_srf
+    type(mapping_type),                pointer :: map_pf_sub_to_clm_sub
+    type(mapping_type),                pointer :: map_pf_srf_to_clm_srf
+  end type parflow_model_type
+
+  private :: &
+       pflotranModelSetupMappingFiles
+
+
+!..................................................................
+! change this to EM_PARFLOW_Solve_Soil_Hydro
+  subroutine parflow_run(model, DT, CURR_SECS, ims, ime, jms, jme,   &
+     &               its, ite, jts, jte, num_soil_layers, &
+     &               PF_FLUX, PF_PRESSURE, PF_POROSITY, PF_SATURATION)
+
+      type(pflotran_model_type), pointer, intent(inout) :: model
+
+      INTEGER, INTENT(IN) ::  ims, ime, jms, jme,its, ite, jts, jte, num_soil_layers
+      REAL, INTENT(IN) :: DT, CURR_SECS
+      INTEGER i,j,k
+
+      INTEGER GHOST_SIZE_I_LOWER, GHOST_SIZE_J_LOWER
+      INTEGER GHOST_SIZE_I_UPPER, GHOST_SIZE_J_UPPER
+
+      REAL :: PF_FLUX( ims:ime,  1:num_soil_layers, jms:jme)
+      REAL :: PF_PRESSURE(ims:ime,  1:num_soil_layers, jms:jme)
+      REAL :: PF_POROSITY( ims:ime,  1:num_soil_layers, jms:jme)
+      REAL :: PF_SATURATION( ims:ime,  1:num_soil_layers, jms:jme)
+      REAL*8 PFDT, PF_time
+
+
+      GHOST_SIZE_I_LOWER=its - ims;
+      GHOST_SIZE_J_LOWER=jts - jms;
+
+      GHOST_SIZE_I_UPPER=ime - ite;
+      GHOST_SIZE_J_UPPER=jme - jte;
+
+! RMM convert from seconds to hours before sending time to PF
+      PFDT = DBLE(DT) / 3600.0d0
+      PF_TIME = DBLE(CURR_SECS) / 3600.d0
+
+      WRITE(*,*) 'in parflow_advance t=', CURR_SECS
+!     parflow run to completion for this given time step
+      call elmparflowadvance(PF_TIME, PFDT, PF_FLUX, PF_PRESSURE, PF_POROSITY, &
+          PF_SATURATION, num_soil_layers, GHOST_SIZE_I_LOWER, &
+          GHOST_SIZE_J_LOWER,&
+          GHOST_SIZE_I_UPPER, GHOST_SIZE_J_UPPER)
+
+  end subroutine parflow_run
+
+!------------------------------------------------------------------
+  subroutine parflowModelGetVariables(sat,vol,porosity,pressure,volume)
+  !
+  ! Extract soil saturation values simulated by
+  ! PFLOTRAN in a PETSc vector.
+
+    ! Save the saturation values
+    call VecGetArrayF90(clm_pf_idata%sat_pf, sat_pf_p, ierr)
+    call VecGetArrayF90(clm_pf_idata%mass_pf, mass_pf_p, ierr)
+    do local_id=1, grid%nlmax
+      ghosted_id=grid%nL2G(local_id)
+      sat_pf_p(local_id)=sat(ghosted_id)
+      mass_pf_p(local_id)= sat(ghosted_id) * 1000.0 * volume(ghosted_id) * porosity(ghosted_id)
+    enddo
+    call VecRestoreArrayF90(clm_pf_idata%sat_pf, sat_pf_p, ierr)
+    call VecRestoreArrayF90(clm_pf_idata%mass_pf, mass_pf_p, ierr)
+
+    call MappingSourceToDestination(parflow_model%map_pf_sub_to_clm_sub, &
+                                    clm_pf_idata%sat_pf, &
+                                    clm_pf_idata%sat_clm)
+
+    call MappingSourceToDestination(parflow_model%map_pf_sub_to_clm_sub, &
+                                    clm_pf_idata%mass_pf, &
+                                    clm_pf_idata%mass_clm)
+
+  end subroutine pflotranModelGetSaturation
+
+! ************************************************************************** !
+  subroutine parflowModelUpdateSourceSink(parflow_model,pf_flux)
+  !
+  ! Update the source/sink term
+  !
+  ! Author: Gautam Bisht
+  ! Date: 11/22/2011
+  !
+
+    use clm_parflow_interface_data
+
+    implicit none
+
+    type(parflow_model_type), pointer        :: parflow_model
+
+    PetscInt                                  :: local_id
+    PetscInt                                  :: ghosted_id
+
+    call MappingSourceToDestination(pflotran_model%map_clm_sub_to_pf_sub, &
+                                    clm_pf_idata%qflx_clm, &
+                                    clm_pf_idata%qflx_pf)
+    ! Update the source/sink term
+    call VecGetArrayF90(clm_pf_idata%qflx_pf,qflx_pf_loc,ierr)
+    do local_id=1, grid%nlmax
+      ghosted_id=grid%nL2G(local_id)
+      qflx_pf(ghosted_id)=qflx_pf_loc(local_id)
+    enddo
+    call VecRestoreArrayF90(clm_pf_idata%qflx_pf,qflx_pf_loc,ierr)
+  end subroutine parflowModelUpdateSourceSink
+!
+end module ExternalModelPARFLOWMod

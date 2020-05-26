@@ -1,0 +1,35 @@
+module elm_parflow_module
+implicit none
+!
+integer, dimension(:), allocatable :: pf_l2n       !local to natural
+integer, dimension(:), allocatable :: pf_g2n       !ghosted to natural
+integer, dimension(:), allocatable :: pf_grid_mask !ghosted grid mask, ghosted 0,local 1
+integer, dimension(:), allocatable :: pf_grid_vol  !ghosted grid volume
+integer :: pf_nxdim            !domain size in x
+integer :: pf_nydim
+integer :: pf_nzdim
+integer :: pf_num_loc_nodes    !number of local nodes
+integer :: pf_num_nodes        !number of ghosted nodes
+
+contains
+!
+  subroutine parflow_init(filename)
+    character *(*), intent (in) :: filename
+    !
+    write(*,*) 'in parflow_init'
+    call elmparflowinit(filename, pf_num_loc_nodes, pf_num_nodes, pf_nxdim, pf_nydim, pf_nzdim,p)
+    allocate(pf_l2n(num_loc_nodes))
+    allocate(pf_g2n(num_nodes))
+    allocate(pf_grid_mask(num_nodes))
+    allocate(pf_grid_vol(num_nodes))
+    pf_l2n(:) = 0
+    pf_g2n(:) = 0
+    pf_grid_mask(:) = 0
+    pf_grid_vol(:) = 0.d0
+    !
+    call elmparflowgrid(pf_nxdim, pf_nydim, pf_nzdim, pf_l2n, pf_g2n, pf_grid_mask, pf_grid_vol)    
+!
+  end subroutine parflow_init
+
+end module elm_parflow_module
+
