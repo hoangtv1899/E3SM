@@ -18,6 +18,9 @@ module ExternalModelConstants
 
   integer, public, parameter :: EM_ID_PFLOTRAN                                   = 200
 
+  integer, public, parameter :: EM_ID_PARFLOW                                    = 202
+  integer, public, parameter :: EM_PARFLOW_SOIL_HYDRO_STAGE                      = 203
+
   integer, public, parameter :: EM_ID_VSFM                                       = 300
   integer, parameter, public :: EM_VSFM_SOIL_HYDRO_STAGE                         = 301
 

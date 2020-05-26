@@ -15,6 +15,7 @@ module ExternalModelInterfaceMod
 #ifdef USE_PETSC_LIB
   use ExternalModelVSFMMod                  , only : em_vsfm_type
   use ExternalModelPTMMod                   , only : em_ptm_type
+  use ExternalModelPARFLOWMod               , only : em_parflow_type
 #endif
   use ExternalModelFATESMod                 , only : em_fates_type
   use ExternalModelStubMod                  , only : em_stub_type
@@ -39,6 +40,9 @@ module ExternalModelInterfaceMod
   implicit none
   !
   private
+  character(len=512), private:: parflow_prefix = ''
+  character(len=512), private:: pf_elm_mapfile = ''
+  character(len=32), private :: restart_stamp = ''
 
   integer :: num_em              ! Number of external models
   integer :: nclumps
@@ -47,6 +51,7 @@ module ExternalModelInterfaceMod
   integer :: index_em_betr
   integer :: index_em_fates
   integer :: index_em_pflotran
+  integer :: index_em_parflow
   integer :: index_em_stub
   integer :: index_em_vsfm
   integer :: index_em_ptm
@@ -57,6 +62,7 @@ module ExternalModelInterfaceMod
 #ifdef USE_PETSC_LIB
   class(em_vsfm_type)                , pointer :: em_vsfm(:)
   class(em_ptm_type)                 , pointer :: em_ptm(:)
+  class(em_parflow_type)            , pointer :: em_parflow(:)
 #endif
   class(em_fates_type)               , pointer :: em_fates
   class(em_stub_type)                , pointer :: em_stub(:)
@@ -64,6 +70,8 @@ module ExternalModelInterfaceMod
   public :: EMI_Determine_Active_EMs
   public :: EMI_Init_EM
   public :: EMI_Driver
+  public :: EMI_Set_Restart_Stamp
+  public :: EMI_ReadNameList_For_PARFLOW
 
 contains
 
@@ -79,6 +87,7 @@ contains
     use clm_varctl, only : use_betr
     use clm_varctl, only : use_pflotran
     use clm_varctl, only : use_vsfm
+    use clm_varctl, only : use_parflow_via_emi
 #endif
     use clm_varctl, only : use_petsc_thermal_model
     use clm_varctl, only : use_em_stub
@@ -93,6 +102,7 @@ contains
     index_em_betr        = 0
     index_em_fates       = 0
     index_em_pflotran    = 0
+    index_em_parflow    = 0
     index_em_stub        = 0
     index_em_vsfm        = 0
 
@@ -112,7 +122,14 @@ contains
        index_em_betr     = num_em
     endif
 
-    ! Is PFLOTRAN active?
+    if (use_parflow_via_emi) then
+       num_em            = num_em + 1
+       index_em_parflow = num_em
+#ifdef USE_PETSC_LIB
+       allocate(em_parflow(nclumps))
+#endif
+    endif
+ ! Is PFLOTRAN active?
     if (use_pflotran) then
        num_em            = num_em + 1
        index_em_pflotran = num_em
@@ -150,6 +167,7 @@ contains
        write(iulog,*) '  Is BeTR present?     ',(index_em_betr     >0)
        write(iulog,*) '  Is FATES present?    ',(index_em_fates    >0)
        write(iulog,*) '  Is PFLOTRAN present? ',(index_em_pflotran >0)
+       write(iulog,*) '  Is PARFLOW present? ',(index_em_parflow >0)
        write(iulog,*) '  Is PTM present?      ',(index_em_ptm      >0)
        write(iulog,*) '  Is Stub EM present?  ',(index_em_stub     >0)
        write(iulog,*) '  Is VSFM present?     ',(index_em_vsfm     >0)
@@ -171,6 +189,92 @@ contains
     call emid_dim_list%Init()
 
   end subroutine EMI_Determine_Active_EMs
+
+  !-----------------------------------------------------------------------
+  subroutine EMI_Set_Restart_Stamp(clm_restart_filename)
+  !
+  ! !DESCRIPTION: Set the parflow restart date stamp. Note we do NOT
+  ! restart here, that gets handled by parflow's internal
+  ! initialization during interface_init_clm_pf()
+  !
+  ! !USES:
+  ! !ARGUMENTS:
+    character(len=256), intent(in) :: clm_restart_filename
+  ! !LOCAL VARIABLES:
+    integer :: name_length, start_pos, end_pos
+    character(len=32) :: clm_stamp
+  !EOP
+  !-----------------------------------------------------------------------
+
+    ! clm restart file name is of the form:
+    !     ${CASE_NAME}.clm2.r.YYYY-MM-DD-SSSSS.nc
+    ! we need to extract the: YYYY-MM-DD-SSSSS
+    write(*, '("clm-pf : clm restart file name : ", A/)') trim(clm_restart_filename)
+    name_length = len(trim(clm_restart_filename))
+    start_pos = name_length - 18
+    end_pos = name_length - 3
+    clm_stamp = clm_restart_filename(start_pos : end_pos)
+    write(*, '("clm-pf : clm date stamp : ", A/)') trim(clm_stamp)
+    restart_stamp = clm_stamp
+
+  end subroutine EMI_Set_Restart_Stamp
+
+  !-----------------------------------------------------------------------
+  subroutine EMI_ReadNameList_For_PARFLOW( NLFilename )
+    !
+    ! !DESCRIPTION:
+    ! Read namelist for clm-parflow interface
+    !
+    ! !USES:
+    use clm_varctl    , only : iulog
+    use spmdMod       , only : masterproc, mpicom, MPI_CHARACTER
+    use fileutils     , only : getavu, relavu, opnfil
+    use clm_nlUtilsMod, only : find_nlgroup_name
+    use shr_nl_mod    , only : shr_nl_find_group_name
+    use shr_mpi_mod   , only : shr_mpi_bcast
+    use abortutils    , only : endrun
+
+    implicit none
+
+    ! !ARGUMENTS:
+    character(len=*), intent(IN) :: NLFilename ! Namelist filename
+    ! !LOCAL VARIABLES:
+    integer :: ierr                 ! error code
+    integer :: unitn                ! unit for namelist file
+    character(len=32) :: subname = 'EMI_ReadNameList_For_PARFLOW'  ! subroutine name
+    !EOP
+    !-----------------------------------------------------------------------
+    namelist / clm_parflow_inparm / parflow_prefix, pf_elm_mapfile
+
+    ! ----------------------------------------------------------------------
+    ! Read namelist from standard namelist file.
+    ! ----------------------------------------------------------------------
+
+    if (masterproc) then
+
+       unitn = getavu()
+       write(iulog,*) 'Read in clm-parflow namelist'
+       call opnfil (NLFilename, unitn, 'F')
+       call shr_nl_find_group_name(unitn, 'clm_parflow_inparm', status=ierr)
+       if (ierr == 0) then
+          read(unitn, clm_parflow_inparm, iostat=ierr)
+          if (ierr /= 0) then
+             call endrun(msg=subname //':: ERROR: reading clm_parflow_inparm namelist.'//&
+                  errMsg(__FILE__, __LINE__))
+          end if
+       end if
+       call relavu( unitn )
+       write(iulog, '(/, A)') " clm-parflow namelist:"
+       write(iulog, '(A, " : ", A,/)') "   parflow_prefix",trim(parflow_prefix)
+       write(iulog, '(A, " : ", A,/)') "   pf_elm_mapfile",trim(pf_elm_mapfile)
+    end if
+
+    ! Broadcast namelist variables read in
+    call shr_mpi_bcast(parflow_prefix, mpicom)
+    call shr_mpi_bcast(pf_elm_mapfile, mpicom)
+
+  end subroutine EMI_ReadNameList_For_PARFLOW
+
   
   !-----------------------------------------------------------------------
   subroutine EMI_Init_EM(em_id)
@@ -183,6 +287,7 @@ contains
     use ExternalModelConstants, only : EM_ID_BETR
     use ExternalModelConstants, only : EM_ID_FATES
     use ExternalModelConstants, only : EM_ID_PFLOTRAN
+    use ExternalModelConstants, only : EM_ID_PARFLOW
     use ExternalModelConstants, only : EM_ID_VSFM
     use ExternalModelConstants, only : EM_ID_PTM
     use ExternalModelConstants, only : EM_ID_STUB
@@ -281,6 +386,135 @@ contains
        !$OMP END PARALLEL DO
 
     case (EM_ID_PFLOTRAN)
+    case (EM_ID_PARFLOW) 
+#ifdef USE_PETSC_LIB
+       ! during initialization step
+
+       allocate(l2e_init_list(nclumps))
+       allocate(e2l_init_list(nclumps))
+
+       do clump_rank = 1, nclumps
+          iem = (index_em_parflow-1)*nclumps + clump_rank
+
+          call l2e_init_list(clump_rank)%Init()
+          call e2l_init_list(clump_rank)%Init()
+
+          ! Fill the data list:
+          !  - Data need during the initialization
+          select type(em_parflow)
+          class is(em_parflow_type)
+             call em_parflow(clump_rank)%PreInit(parflow_prefix,pf_elm_mapfile,restart_stamp)
+          class default
+          end select
+          call em_parflow(clump_rank)%Populate_L2E_Init_List(l2e_init_list(clump_rank))
+          call em_parflow(clump_rank)%Populate_E2L_Init_List(e2l_init_list(clump_rank))
+
+          !  - Data need during timestepping
+          call em_parflow(clump_rank)%Populate_L2E_List(l2e_driver_list(iem))
+          call em_parflow(clump_rank)%Populate_E2L_List(e2l_driver_list(iem))
+       enddo
+       !$OMP PARALLEL DO PRIVATE (clump_rank, iem, bounds_clump)
+       do clump_rank = 1, nclumps
+
+          call get_clump_bounds(clump_rank, bounds_clump)
+          iem = (index_em_parflow-1)*nclumps + clump_rank
+
+          ! Allocate memory for data
+          call EMI_Setup_Data_List(l2e_init_list(clump_rank), bounds_clump)
+          call EMI_Setup_Data_List(e2l_init_list(clump_rank), bounds_clump)
+          call EMI_Setup_Data_List(l2e_driver_list(iem)     , bounds_clump)
+          call EMI_Setup_Data_List(e2l_driver_list(iem)     , bounds_clump)
+
+          ! GB_FIX_ME: Create a temporary filter
+          num_filter_col = bounds_clump%endc - bounds_clump%begc + 1
+          num_filter_lun = bounds_clump%endl - bounds_clump%begl + 1
+
+          allocate(filter_col(num_filter_col))
+          allocate(filter_lun(num_filter_lun))
+
+          do ii = 1, num_filter_col
+             filter_col(ii) = bounds_clump%begc + ii - 1
+          enddo
+
+          do ii = 1, num_filter_lun
+             filter_lun(ii) = bounds_clump%begl + ii - 1
+          enddo
+
+          ! Reset values in the data list
+          call EMID_Reset_Data_for_EM(l2e_init_list(clump_rank), em_stage)
+          call EMID_Reset_Data_for_EM(e2l_init_list(clump_rank), em_stage)
+
+          ! Pack all ALM data needed by the external model
+          call EMI_Pack_WaterStateType_at_Column_Level_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_col, filter_col, waterstate_vars)
+          call EMI_Pack_WaterFluxType_at_Column_Level_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_col, filter_col, waterflux_vars)
+          call EMI_Pack_SoilHydrologyType_at_Column_Level_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_col, filter_col, soilhydrology_vars)
+          call EMI_Pack_SoilStateType_at_Column_Level_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_col, filter_col, soilstate_vars)
+          call EMI_Pack_ColumnType_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_col, filter_col)
+          call EMI_Pack_Landunit_for_EM(l2e_init_list(clump_rank), em_stage, &
+               num_filter_lun, filter_lun)
+
+          ! Ensure all data needed by external model is packed
+          call EMID_Verify_All_Data_Is_Set(l2e_init_list(clump_rank), em_stage)
+
+          ! Initialize the external model
+          call em_parflow(clump_rank)%Init(l2e_init_list(clump_rank),e2l_init_list(clump_rank),iam,bounds_clump)
+
+          ! Build a column level filter on which VSFM is active.
+          ! This new filter would be used during the initialization to
+          ! unpack data from the EM into ALM's data structure.
+          allocate(tmp_col(bounds_clump%begc:bounds_clump%endc))
+          tmp_col(bounds_clump%begc:bounds_clump%endc) = 0
+
+          num_e2l_filter_col = 0
+          do c = bounds_clump%begc,bounds_clump%endc
+             if (col_pp%active(c)) then
+                l = col_pp%landunit(c)
+                if (lun_pp%itype(l) == istsoil .or. col_pp%itype(c) == icol_road_perv .or. &
+                    lun_pp%itype(l) == istcrop) then
+                   num_e2l_filter_col = num_e2l_filter_col + 1
+                   tmp_col(c) = 1
+                end if
+             end if
+          end do
+
+          allocate(e2l_filter_col(num_e2l_filter_col))
+
+          num_e2l_filter_col = 0
+          do c = bounds_clump%begc,bounds_clump%endc
+             if (tmp_col(c) == 1) then
+                num_e2l_filter_col = num_e2l_filter_col + 1
+                e2l_filter_col(num_e2l_filter_col) = c
+             endif
+          enddo
+          ! Unpack all data sent from the external model
+          call EMI_Unpack_SoilStateType_at_Column_Level_from_EM(e2l_init_list(clump_rank), em_stage, &
+               num_e2l_filter_col, e2l_filter_col, soilstate_vars)
+          call EMI_Unpack_WaterStateType_at_Column_Level_from_EM(e2l_init_list(clump_rank), em_stage, &
+               num_e2l_filter_col, e2l_filter_col, waterstate_vars)
+          call EMI_Unpack_WaterFluxType_at_Column_Level_from_EM(e2l_init_list(clump_rank), em_stage, &
+               num_e2l_filter_col, e2l_filter_col, waterflux_vars)
+          call EMI_Unpack_SoilHydrologyType_at_Column_Level_from_EM(e2l_init_list(clump_rank), em_stage, &
+               num_e2l_filter_col, e2l_filter_col, soilhydrology_vars)
+
+          ! Ensure all data sent by external model is unpacked
+          call EMID_Verify_All_Data_Is_Set(e2l_init_list(clump_rank), em_stage)
+
+          ! Clean up memory
+          call l2e_init_list(clump_rank)%Destroy()
+          call e2l_init_list(clump_rank)%Destroy()
+
+          deallocate(e2l_filter_col)
+          deallocate(tmp_col)
+
+       enddo
+       !$OMP END PARALLEL DO
+
+#endif
 
     case (EM_ID_VSFM)
 
@@ -712,6 +946,7 @@ contains
     use ExternalModelConstants , only : EM_ID_BETR
     use ExternalModelConstants , only : EM_ID_FATES
     use ExternalModelConstants , only : EM_ID_PFLOTRAN
+    use ExternalModelConstants , only : EM_ID_PARFLOW
     use ExternalModelConstants , only : EM_ID_VSFM
     use ExternalModelConstants , only : EM_ID_PTM
     use ExternalModelConstants , only : EM_ID_STUB
@@ -773,6 +1008,8 @@ contains
        index_em = index_em_fates
     case (EM_ID_PFLOTRAN)
        index_em = index_em_pflotran
+    case (EM_ID_PARFLOW)
+       index_em = index_em_parflow
     case (EM_ID_VSFM)
        index_em = index_em_vsfm
     case (EM_ID_PTM)
@@ -962,6 +1199,14 @@ contains
             e2l_driver_list(iem), bounds_clump)
 
     case (EM_ID_PFLOTRAN)
+
+    case (EM_ID_PARFLOW)
+#ifdef USE_PETSC_LIB
+       call em_parflow(clump_rank)%Solve(em_stage, dtime, nstep, clump_rank, &
+            l2e_driver_list(iem), e2l_driver_list(iem), bounds_clump)
+#else
+       call endrun('PARFLOW is on but code was not compiled with -DUSE_PETSC_LIB')
+#endif
 
     case (EM_ID_VSFM)
 #ifdef USE_PETSC_LIB
