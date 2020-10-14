@@ -174,7 +174,7 @@ contains
     endif
 
     if (num_em > 1) then
-       call endrun(msg='More than 1 external model is not supported.')
+!       call endrun(msg='More than 1 external model is not supported.')
     endif
 
     allocate(l2e_driver_list(num_em*nclumps))
@@ -302,6 +302,8 @@ contains
     use clm_instMod           , only : waterflux_inst
     use clm_instMod           , only : waterstate_inst
 #endif
+    use clm_varpar            , only : nlevgrnd
+    use ColumnDataType        , only : col_ws
     use ExternalModelBETRMod  , only : EM_BETR_Populate_L2E_List
     use ExternalModelBETRMod  , only : EM_BETR_Populate_E2L_List
     use decompMod             , only : get_clump_bounds
@@ -330,6 +332,7 @@ contains
     type(bounds_type)             :: bounds_clump
     integer                       :: iem
     integer                       :: clump_rank
+    integer                       :: j
 
     em_stage = EM_INITIALIZATION_STAGE
 
@@ -503,6 +506,21 @@ contains
 
           ! Ensure all data sent by external model is unpacked
           call EMID_Verify_All_Data_Is_Set(e2l_init_list(clump_rank), em_stage)
+          associate(& 
+            h2osoi_liq    => col_ws%h2osoi_liq    , &
+            smp_l => soilstate_vars%smp_l_col , &
+            watsat => soilstate_vars%watsat_col , &
+            hksat  => soilstate_vars%hksat_col  , &
+            bsw    => soilstate_vars%bsw_col    , &
+            sucsat => soilstate_vars%sucsat_col   &
+            )
+            do ii = 1, num_e2l_filter_col
+                c = e2l_filter_col(ii)
+                do j = 1, nlevgrnd
+                   smp_l(c,j) = -sucsat(c,j)*(col_ws%h2osoi_liq(c,j)/watsat(c,j))**(-bsw(c,j))
+                enddo
+            enddo
+          end associate
 
           ! Clean up memory
           call l2e_init_list(clump_rank)%Destroy()
@@ -512,6 +530,8 @@ contains
           deallocate(tmp_col)
 
        enddo
+
+
        !$OMP END PARALLEL DO
 
 #endif
@@ -961,6 +981,8 @@ contains
     use CNCarbonStateType      , only : carbonstate_type
     use ExternalModelBETRMod   , only : EM_BETR_Solve
     use decompMod              , only : get_clump_bounds
+    use ColumnDataType        , only : col_ws
+    use clm_varpar            , only : nlevgrnd
     !
     implicit none
     !
@@ -999,6 +1021,7 @@ contains
     integer, pointer :: filter_grid(:)
     integer          :: ii
     integer          :: iem
+    integer          :: c,j
 
     ! Find the index_em
     select case (em_id)
@@ -1258,6 +1281,21 @@ contains
 
        call EMI_Unpack_SoilStateType_at_Column_Level_from_EM(e2l_driver_list(iem), em_stage, &
             num_hydrologyc, filter_hydrologyc, soilstate_vars)
+       associate(& 
+            h2osoi_liq    => col_ws%h2osoi_liq    , &
+            smp_l => soilstate_vars%smp_l_col , &
+            watsat => soilstate_vars%watsat_col , &
+            hksat  => soilstate_vars%hksat_col  , &
+            bsw    => soilstate_vars%bsw_col    , &
+            sucsat => soilstate_vars%sucsat_col   &
+            )
+            do ii = 1, num_hydrologyc
+                c = filter_hydrologyc(ii)
+                do j = 1, nlevgrnd
+                   smp_l(c,j) = -sucsat(c,j)*(col_ws%h2osoi_liq(c,j)/watsat(c,j))**(-bsw(c,j))
+                enddo
+            enddo
+       end associate
     endif
 
     if ( present(soilhydrology_vars) .and. &

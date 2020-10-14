@@ -1225,12 +1225,12 @@ contains
     pftime = curr_secs/3600.d0
     pfdt = dtime/3600.d0
     ! convert unit from kg/s (mm/s) to 1/hr
-!    if(elm_flux(1) .ne. 0.d0) then
+!    if(sum(abs(elm_flux)) .ne. 0.d0) then
 !     print*,'dz-',pf_grid_dz(1:nlevmapped)
 !     print *,'elm-flux-',elm_flux(1:nlevmapped)
 !stop
 !    endif
-    elm_flux(1:nlevmapped) = elm_flux(1:nlevmapped) * 3600.d0 * 1.0d-3 / pf_grid_dz(1:nlevmapped) 
+    elm_flux(:) = elm_flux(:) * 3600.d0 * 1.0d-3 / pf_grid_dz(:) 
     call elmparflowadvance(pftime,pfdt,elm_flux,pf_press,pf_porosity,pf_sat,nlevmapped, &
                            0,0,0,0)
 

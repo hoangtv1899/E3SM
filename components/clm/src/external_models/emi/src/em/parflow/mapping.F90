@@ -532,7 +532,8 @@ contains
 
     character(len=MAXSTRINGLENGTH) :: group_name
     character(len=MAXSTRINGLENGTH) :: dataset_name
-#if 0
+    PetscBool :: attribute_exists
+#if 1 
 #if defined(PETSC_HAVE_HDF5)
     integer(HID_T) :: file_id
     integer(HID_T) :: grp_id, grp_id2
@@ -544,8 +545,11 @@ contains
     integer(HSIZE_T) :: num_data_in_file
     integer(HSIZE_T) :: dims_h5(1), max_dims_h5(1)
     integer(HSIZE_T) :: offset(1), length(1), stride(1), block(1), dims(1)
+    integer(HSIZE_T) :: attribute_dim(1)
+    integer(HID_T) :: attribute_id
+    
 #endif
-
+    character * 20 :: attribute_name
     ! Initialize FORTRAN predefined datatypes
     call h5open_f(hdf5_err)
 
@@ -565,12 +569,12 @@ contains
     !
     
     ! Open group
-    group_name = "/row"
+    group_name = "/A"
 !    option%io_buffer = 'Opening group: ' // trim(group_name)
 !    call printMsg(option)
 
     ! Open dataset
-    call h5dopen_f(file_id,"row",data_set_id,hdf5_err)
+    call h5dopen_f(file_id,"A",data_set_id,hdf5_err)
 
     ! Get dataset's dataspace
     call h5dget_space_f(data_set_id,data_space_id,hdf5_err)
@@ -637,6 +641,17 @@ contains
     ! Convert 1-based to 0-based
     map%s2d_icsr = int_buffer-1
 
+    attribute_name = "nlev"
+    call H5aexists_f(data_set_id,attribute_name,attribute_exists,hdf5_err)
+    if (attribute_exists) then
+
+      attribute_dim = 1
+      call h5aopen_f(data_set_id,attribute_name,attribute_id,hdf5_err)
+      call h5aread_f(attribute_id,H5T_NATIVE_INTEGER,map%clm_nlevsoi, &
+                     attribute_dim,hdf5_err)
+      call h5aclose_f(attribute_id,hdf5_err)
+    endif
+
     call h5dclose_f(data_set_id, hdf5_err)
 
     !
@@ -644,12 +659,12 @@ contains
     !
     
     ! Open group
-    group_name = "/col"
+    group_name = "/B"
 !    option%io_buffer = 'Opening group: ' // trim(group_name)
 !    call printMsg(option)
 !
     ! Open dataset
-    call h5dopen_f(file_id,"col",data_set_id,hdf5_err)
+    call h5dopen_f(file_id,"B",data_set_id,hdf5_err)
 
     ! Get dataset's dataspace
     call h5dget_space_f(data_set_id,data_space_id,hdf5_err)
@@ -715,12 +730,12 @@ contains
     !
     
     ! Open group
-    group_name = "/S"
+    group_name = "/wt"
 !    option%io_buffer = 'Opening group: ' // trim(group_name)
 !    call printMsg(option)
 
     ! Open dataset
-    call h5dopen_f(file_id,"S",data_set_id,hdf5_err)
+    call h5dopen_f(file_id,"wt",data_set_id,hdf5_err)
 
     ! Get dataset's dataspace
     call h5dget_space_f(data_set_id,data_space_id,hdf5_err)

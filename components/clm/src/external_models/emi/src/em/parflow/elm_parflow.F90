@@ -81,6 +81,8 @@ contains
     pf_sr(:) = 0.d0
     z_mult(:) = 0.d0
     call elmparflowsoilprop(pf_permx,pf_permy,pf_permz,pf_porosity,pf_alpha,pf_n,pf_sr,z_mult,num_soil_layers,0,0,0,0)
+    pf_alpha(:) = pf_alpha(:) * 1000.d0 !m to mm
+    pf_n(:) = 1.d0/pf_n(:)
     pf_grid_vol(:) = pf_grid_vol(:)*z_mult(:)
     pf_grid_dz(:) = pf_grid_dz(:)*z_mult(:)
 

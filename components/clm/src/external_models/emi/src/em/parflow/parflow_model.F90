@@ -108,6 +108,7 @@ contains
     allocate(model)
 
     call parflow_init(parflow_file)
+
     !file containing mapfile names
     if (len(trim(mapfile)) > 1) then
       model%map_filename = trim(mapfile)
@@ -120,6 +121,8 @@ contains
     PETSC_COMM_WORLD = MPI_COMM_WORLD
 
     call parflowModelSetupMappingFiles(model,mapfile,mycommsize,myrank)
+!
+!    call parflowsoilprop(model%map_clm_sub_to_pf_sub%clm_nlevsoi)
 !   Initialize saturation
     allocate(pf_sat(pf_num_nodes))
     allocate(pf_press(pf_num_nodes))
@@ -129,7 +132,8 @@ contains
     pf_sat(:) = 0.d0
     pf_press(:) = 0.d0
     pf_por(:) = 0.d0
-    call elmparflowadvance(0.d0,0.d0,elm_flux,pf_press,pf_por,pf_sat,model%map_clm_sub_to_pf_sub%clm_nlevsoi, 0,0,0,0)
+    call elmparflowadvance(0.d0,1.d-8,elm_flux,pf_press,pf_por,pf_sat,model%map_clm_sub_to_pf_sub%clm_nlevsoi, 0,0,0,0)
+print *,'complete advancing---'
     !assign model to output
     parflowModelCreate => model
 
@@ -236,16 +240,16 @@ contains
 
       ! Read mapping file
 !#if 0
-!      if (index(map%filename, '.h5') > 0) then
-!        call MappingReadHDF5(map, map%filename, mycommsize, myrank)
-!      else
+      if (index(map%filename, '.h5') > 0) then
+        call MappingReadHDF5(map, map%filename, mycommsize, myrank)
+      else
       inquire (file = trim(map%filename), exist = lexist)
       if ( .not. lexist )then
          call endrun(msg=' error: elm-parflow mapping file entered does NOT exist:'//&
             trim(map%filename)//errMsg(__FILE__, __LINE__))
       end if
       call MappingReadTxtFile(map, map%filename, mycommsize, myrank)
-!      endif
+      endif
 !#endif
         
     enddo
@@ -394,18 +398,15 @@ end subroutine parflowModelSetICs
       local_id = pf_g2l(ghosted_id)
 
 
-      ! bc_alpha [1/Pa]; while sucsat [mm of H20]
-      ! [Pa] = [mm of H20] * 0.001 [m/mm] * 1000 [kg/m^3] * 9.81 [m/sec^2]
-      sucsat2_pf_loc(local_id) = (pf_alpha(ghosted_id)*grav)
+      sucsat2_pf_loc(local_id) = pf_alpha(ghosted_id)
 
       ! bc_lambda = 1/bsw
       bsw2_pf_loc(local_id) = pf_n(ghosted_id)
 
-      ! perm = hydraulic-conductivity * viscosity / ( density * gravity )
-      ! [m^2]          [mm/sec]
-      hksat_x2_pf_loc(local_id) =pf_permx(ghosted_id)*(den*grav)*1000.d0
-      hksat_y2_pf_loc(local_id) =pf_permy(ghosted_id)*(den*grav)*1000.d0
-      hksat_z2_pf_loc(local_id) =pf_permz(ghosted_id)*(den*grav)*1000.d0
+      ! [m/hr]  ->    [mm/sec]
+      hksat_x2_pf_loc(local_id) =pf_permx(ghosted_id)*1000.d0/3600.d0
+      hksat_y2_pf_loc(local_id) =pf_permy(ghosted_id)*1000.d0/3600.d0
+      hksat_z2_pf_loc(local_id) =pf_permz(ghosted_id)*1000.d0/3600.d0
 
       watsat2_pf_loc(local_id) = pf_porosity(ghosted_id)
 
