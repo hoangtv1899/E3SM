@@ -139,7 +139,7 @@ contains
         call ep_betr%PreDiagSoilColWaterFlux(num_hydrologyc, filter_hydrologyc)
       endif
 
-      if (.not. (use_vsfm) ) then
+      if ((.not. (use_vsfm)) .or. (.not. use_parflow_via_emi)) then
          call Drainage(bounds, num_hydrologyc, filter_hydrologyc, &
               num_urbanc, filter_urbanc,&
               temperature_vars, soilhydrology_vars, soilstate_vars, &

@@ -55,7 +55,8 @@ module clm_varpar
   integer :: numpft      = mxpft   ! actual # of patches (without bare)
   integer :: numcft      =  10     ! actual # of crops
   logical :: crop_prog   = .true.  ! If prognostic crops is turned on
-  integer :: maxpatch_urb= 5       ! max number of urban patches (columns) in urban landunit
+!  integer :: maxpatch_urb= 5       ! max number of urban patches (columns) in urban landunit
+  integer :: maxpatch_urb= 1       ! max number of urban patches (columns) in urban landunit
 
   integer :: maxpatch_pft        ! max number of plant functional types in naturally vegetated landunit (namelist setting)
 

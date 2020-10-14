@@ -45,7 +45,7 @@ contains
     use landunit_varcon  , only : istsoil, istcrop, istice, istice_mec, istdlak, istwet, &
                              isturb_tbd, isturb_hd, isturb_md
     use topounit_varcon  , only : max_topounits
-    use FatesInterfaceMod, only : fates_maxElementsPerSite
+    use FatesInterfaceTypesMod, only : fates_maxElementsPerSite
 
     !
     ! !ARGUMENTS
@@ -157,7 +157,8 @@ contains
        ! space for ALL columns on the urban landunits.
 
        ! Set urban tall building district landunit
-
+!Fang
+!#if 0      
        npfts_per_lunit = 0
        if (urban_valid(gi)) then
           npfts_per_lunit = maxpatch_urb
@@ -290,7 +291,7 @@ contains
           ipfts = ipfts + npfts_per_lunit
        end if
        if (present(ncrop)) ncrop = ncrop + npfts_per_lunit
-    
+!#endif    
     enddo ! end of ntopounits loop
 
     ! -------------------------------------------------------------------------
@@ -326,7 +327,7 @@ contains
     use clm_varsur  , only : wt_lunit, urban_valid, wt_glc_mec
     use landunit_varcon  , only : istsoil, istcrop, istice, istice_mec, istdlak, istwet, &
                              isturb_tbd, isturb_hd, isturb_md
-    use FatesInterfaceMod, only : fates_maxElementsPerSite
+    use FatesInterfaceTypesMod, only : fates_maxElementsPerSite
 
     !
     ! !ARGUMENTS

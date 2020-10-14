@@ -134,7 +134,6 @@ contains
        end do
 
        ! With all topounits defined, next place landunits
-
        ! Determine naturally vegetated landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
           call set_landunit_veg_compete(               &
@@ -142,6 +141,8 @@ contains
                setdata=.true.)
        end do
 
+!Fang
+!#if 0
        ! Determine crop landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
           call set_landunit_crop_noncompete(           &
@@ -199,7 +200,7 @@ contains
                   glcmask = ldomain%glcmask(gdc))
           end do
        endif
-
+!#endif
        ! Ensure that we have set the expected number of pfts, cols and landunits for this clump
        SHR_ASSERT(ti == bounds_clump%endt, errMsg(__FILE__, __LINE__))
        SHR_ASSERT(li == bounds_clump%endl, errMsg(__FILE__, __LINE__))
@@ -545,8 +546,9 @@ contains
              ctype = icol_road_perv
              wtcol2lunit = ((1. - wtlunit_roof)/3) * (wtroad_perv)
           end if
-
-          call add_column(ci=ci, li=li, ctype=ctype, wtlunit=wtcol2lunit)
+!Fang
+!          call add_column(ci=ci, li=li, ctype=ctype, wtlunit=wtcol2lunit)
+          call add_column(ci=ci, li=li, ctype=ctype, wtlunit=1.0_r8)
 
           call add_patch(pi=pi, ci=ci, ptype=noveg, wtcol=1.0_r8)
 

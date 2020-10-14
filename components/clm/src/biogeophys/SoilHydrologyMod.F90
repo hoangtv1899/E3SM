@@ -54,6 +54,7 @@ contains
     use clm_varctl      , only : use_var_soil_thick
     use abortutils      , only : endrun
     use SoilWaterMovementMod, only : zengdecker_2009_with_var_soil_thick
+    use clm_varctl, only : use_parflow_via_emi
     !
     ! !ARGUMENTS:
     type(bounds_type)        , intent(in)    :: bounds               
@@ -201,20 +202,21 @@ contains
 
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
-
+         if(.not. use_parflow_via_emi) then
          ! assume qinmax large relative to qflx_top_soil in control
-         if (origflag == 1) then
-            qflx_surf(c) =  fcov(c) * qflx_top_soil(c)
-         else
+            if (origflag == 1) then
+              qflx_surf(c) =  fcov(c) * qflx_top_soil(c)
+            else
             ! only send fast runoff directly to streams
-            qflx_surf(c) =   fsat(c) * qflx_top_soil(c)
+              qflx_surf(c) =   fsat(c) * qflx_top_soil(c)
+            endif
          endif
       end do
 
       ! Determine water in excess of ponding limit for urban roof and impervious road.
       ! Excess goes to surface runoff. No surface runoff for sunwall and shadewall.
-
-      do fc = 1, num_urbanc
+      if( .not. use_parflow_via_emi ) then
+       do fc = 1, num_urbanc
          c = filter_urbanc(fc)
          if (col_pp%itype(c) == icol_roof .or. col_pp%itype(c) == icol_road_imperv) then
 
@@ -239,8 +241,12 @@ contains
          ! send flood water flux to runoff for all urban columns
          qflx_surf(c) = qflx_surf(c)  + qflx_floodc(c)
 
-      end do
-
+       end do
+      else
+        qflx_surf(:) = 0.d0
+      endif
+!Fang test
+!qflx_surf(:) = 0.d0
       ! remove stormflow and snow on h2osfc from qflx_top_soil
       do fc = 1, num_hydrologyc
          c = filter_hydrologyc(fc)
@@ -268,6 +274,7 @@ contains
      use column_varcon    , only : icol_roof, icol_road_imperv, icol_sunwall, icol_shadewall, icol_road_perv
      use landunit_varcon  , only : istsoil, istcrop
      use clm_time_manager , only : get_step_size
+     use clm_varctl, only : use_parflow_via_emi
      !
      ! !ARGUMENTS:
      type(bounds_type)        , intent(in)    :: bounds               
@@ -383,7 +390,9 @@ contains
 
        do fc = 1, num_hydrologyc
           c = filter_hydrologyc(fc)
-          ! partition moisture fluxes between soil and h2osfc       
+          ! partition moisture fluxes between soil and h2osfc      
+!#if 0
+          if(.not.  use_parflow_via_emi) then
           if (lun_pp%itype(col_pp%landunit(c)) == istsoil .or. lun_pp%itype(col_pp%landunit(c))==istcrop) then
 
              ! explicitly use frac_sno=0 if snl=0
@@ -517,6 +526,26 @@ contains
              end if
              qflx_h2osfc_surf(c) = 0._r8
           endif
+         else
+! parflow
+!#endif
+!Fang test
+!qflx_surf = 0
+             if (snl(c) >= 0) then
+                ! when no snow present, sublimation is removed in Drainage
+                qflx_infl(c) = qflx_top_soil(c) - qflx_evap_grnd(c)
+                qflx_gross_infl_soil(c) = qflx_top_soil(c)
+                qflx_gross_evap_soil(c) = qflx_evap_grnd(c)                
+             else
+                qflx_infl(c) = qflx_top_soil(c) &
+                     - (1.0_r8 - frac_sno(c)) * qflx_ev_soil(c)
+                qflx_gross_infl_soil(c) = qflx_top_soil(c)
+                qflx_gross_evap_soil(c) = (1.0_r8 - frac_sno(c)) * qflx_ev_soil(c)                     
+             end if
+             qflx_h2osfc_surf(c) = 0._r8
+!#if 0
+         endif
+!#endif
 
        enddo
 
@@ -1061,7 +1090,7 @@ contains
        end do
 
        rous = 0.2_r8
-
+!#if 0
        !==  BASEFLOW ==================================================
        ! perched water table code
        do fc = 1, num_hydrologyc
@@ -1518,7 +1547,9 @@ contains
              qflx_qrgwl(c) = qflx_snwcp_liq(c)
           end if
        end do
-
+!#endif
+!Fang test
+!qflx_drain(:) = 0.0
      end associate
 
    end subroutine Drainage

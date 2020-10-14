@@ -142,6 +142,7 @@ module ncdio_pio
   real(r8), parameter  , public  :: fillvalue = 1.e36_r8     ! fill value for netcdf fields
 
   integer, public :: io_type
+  integer, public :: io_fmt
 
   type(iosystem_desc_t), pointer, public  :: pio_subsystem
 
@@ -167,13 +168,13 @@ contains
     ! Initial PIO
     !
     ! !USES:
-    use shr_pio_mod     , only : shr_pio_getiosys, shr_pio_getiotype
+    use shr_pio_mod     , only : shr_pio_getiosys, shr_pio_getiotype, shr_pio_getioformat
     use clm_varctl      , only : inst_name
     !-----------------------------------------------------------------------
 
     PIO_subsystem => shr_pio_getiosys(inst_name)
     io_type       =  shr_pio_getiotype(inst_name)
-
+    io_fmt         = shr_pio_getioformat(inst_name)
   end subroutine ncd_pio_init
 
   !-----------------------------------------------------------------------
@@ -235,7 +236,9 @@ contains
     ! !LOCAL VARIABLES:
     logical :: l_avoid_pnetcdf  ! local version of avoid_pnetcdf
     integer :: my_io_type
+    integer :: my_io_fmt
     integer :: ierr
+    integer :: mode
     !-----------------------------------------------------------------------
 
     l_avoid_pnetcdf = .false.
@@ -244,6 +247,8 @@ contains
     end if
 
     my_io_type = io_type
+    my_io_fmt = io_fmt
+    mode = ior(io_fmt, PIO_CLOBBER)
     if (l_avoid_pnetcdf) then
        if (my_io_type == pio_iotype_pnetcdf) then
           my_io_type = pio_iotype_netcdf
@@ -255,7 +260,8 @@ contains
        end if
     end if
 
-    ierr = pio_createfile(pio_subsystem, file, my_io_type, fname, ior(PIO_CLOBBER,PIO_64BIT_OFFSET))
+!    ierr = pio_createfile(pio_subsystem, file, my_io_type, fname, ior(PIO_CLOBBER,PIO_64BIT_OFFSET))
+    ierr = pio_createfile(pio_subsystem, file, my_io_type, fname, mode)
 
     if(ierr/= PIO_NOERR) then
        call shr_sys_abort( ' ncd_pio_createfile ERROR: Failed to open file to write: '//trim(fname))
