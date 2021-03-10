@@ -85,7 +85,7 @@ contains
 
 ! ************************************************************************** !
 
-  function parflowModelCreate(mpicomm, mycommsize,myrank,parflow_file,mapfile)
+  function parflowModelCreate(mpicomm,mycommsize,myrank,parflow_file,mapfile)
   ! 
   ! Allocates and initializes the parflowModel object.
   ! 
@@ -100,10 +100,12 @@ contains
     integer, intent(in)  :: myrank
     character(len=*), intent(in) :: mapfile 
     character(len=*), intent(in) :: parflow_file
+    
 
     type(parflow_model_type), pointer :: parflowModelCreate
 
     type(parflow_model_type),      pointer :: model
+    PetscReal :: cur_time, cur_dt
 
     allocate(model)
 
@@ -132,8 +134,9 @@ contains
     pf_sat(:) = 0.d0
     pf_press(:) = 0.d0
     pf_por(:) = 0.d0
-    call elmparflowadvance(0.d0,1.d-8,elm_flux,pf_press,pf_por,pf_sat,model%map_clm_sub_to_pf_sub%clm_nlevsoi, 0,0,0,0)
-print *,'complete advancing---'
+    cur_time = 0.0
+    cur_dt = 1.e-8
+    call elmparflowadvance(cur_time,cur_dt,elm_flux,pf_press,pf_por,pf_sat,model%map_clm_sub_to_pf_sub%clm_nlevsoi, 0,0,0,0)
     !assign model to output
     parflowModelCreate => model
 
