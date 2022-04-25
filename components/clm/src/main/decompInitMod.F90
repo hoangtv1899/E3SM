@@ -58,7 +58,7 @@ contains
     ! !LOCAL VARIABLES:
     integer :: lns                    ! global domain size
     integer :: ln,lj                  ! indices
-    integer :: ag,an,ai,aj            ! indices
+    integer :: ag,an,ai,aj,an_r            ! indices
     integer :: numg                   ! number of land gridcells
     logical :: seglen1                ! is segment length one
     real(r8):: seglen                 ! average segment length
@@ -272,6 +272,7 @@ contains
     ! Set ldecomp
 
     allocate(ldecomp%gdc2glo(numg), stat=ier)
+    allocate(ldecomp%gdc2glo_rc(numg), stat=ier)
     if (ier /= 0) then
        write(iulog,*) 'decompInit_lnd(): allocation error1 for ldecomp, etc'
        call endrun(msg=errMsg(__FILE__, __LINE__))
@@ -283,6 +284,7 @@ contains
     end if
 
     ldecomp%gdc2glo(:) = 0
+    ldecomp%gdc2glo_rc(:) = 0
     ag = 0
 
     ! clumpcnt is the start gdc index of each clump
@@ -294,14 +296,16 @@ contains
 
     ! now go through gridcells one at a time and increment clumpcnt
     ! in order to set gdc2glo
-
+    an_r = 0
     do aj = 1,lnj
     do ai = 1,lni
        an = (aj-1)*lni + ai
        cid = lcid(an)
        if (cid > 0) then
+          an_r = an_r + 1
           ag = clumpcnt(cid)
           ldecomp%gdc2glo(ag) = an
+          ldecomp%gdc2glo_rc(ag) = an_r
           clumpcnt(cid) = clumpcnt(cid) + 1
        end if
     end do

@@ -622,10 +622,10 @@ contains
     do g = bounds%begg, bounds%endg
        do j = 1,nlevmapped
           clm_npts = clm_npts + 1
-          clm_cell_ids_nindex(clm_npts) = (ldecomp%gdc2glo(g)-1)*nlevmapped + j - 1
+          clm_cell_ids_nindex(clm_npts) = (ldecomp%gdc2glo_rc(g)-1)*nlevmapped + j - 1
        enddo
        clm_surf_npts = clm_surf_npts + 1
-       clm_surf_cell_ids_nindex(clm_surf_npts) = (ldecomp%gdc2glo(g)-1)*nlevmapped
+       clm_surf_cell_ids_nindex(clm_surf_npts) = (ldecomp%gdc2glo_rc(g)-1)*nlevmapped
     enddo
 
     ! Initialize maps for transferring data between CLM and PARFLOW. Defined in

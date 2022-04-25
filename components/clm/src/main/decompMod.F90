@@ -170,6 +170,7 @@ module decompMod
   !--- gdc = 1d global dc ordered compressed
   type decomp_type
      integer,pointer :: gdc2glo(:)    ! 1d gdc to 1d glo
+     integer,pointer :: gdc2glo_rc(:)    ! 1d gdc to 1d glo, recount
   end type decomp_type
   public decomp_type
   type(decomp_type),public,target :: ldecomp

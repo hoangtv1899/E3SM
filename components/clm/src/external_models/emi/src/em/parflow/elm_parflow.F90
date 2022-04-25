@@ -34,7 +34,7 @@ contains
     character *(*), intent (in) :: filename
     !
     call elmparflowinit(filename, pf_num_nodes, pf_num_loc_nodes, pf_nxdim, pf_nydim, pf_nzdim)
-    write(*,*) 'in parflow_init',pf_num_loc_nodes,pf_num_nodes,pf_nxdim,pf_nydim,pf_nzdim
+!    write(*,*) 'in parflow_init',pf_num_loc_nodes,pf_num_nodes,pf_nxdim,pf_nydim,pf_nzdim
     allocate(pf_l2n(pf_num_loc_nodes))
     allocate(pf_l2g(pf_num_loc_nodes))
     allocate(pf_g2n(pf_num_nodes))
