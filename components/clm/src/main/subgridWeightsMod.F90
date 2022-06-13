@@ -545,7 +545,7 @@ contains
     ! !LOCAL VARIABLES:
     real(r8) :: wt_lunit ! subgrid weight of the given landunit
 
-    real(r8), parameter :: tolerance = 1.e-13_r8  ! tolerance for checking whether landunit's weight is 1
+    real(r8), parameter :: tolerance = 1.e-6_r8  ! tolerance for checking whether landunit's weight is 1
     character(len=*), parameter :: subname = 'is_topo_all_ltypeX'
     !------------------------------------------------------------------------------
 
@@ -713,7 +713,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     logical :: weights_equal_1
-    real(r8), parameter :: tolerance = 1.e-12_r8  ! tolerance for checking whether weights sum to 1
+    real(r8), parameter :: tolerance = 1.e-6_r8  ! tolerance for checking whether weights sum to 1
     !------------------------------------------------------------------------
 
     weights_equal_1 = (abs(sumwts - 1._r8) <= tolerance)

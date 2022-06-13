@@ -42,7 +42,7 @@ contains
     logical :: found
     integer :: nl
     integer :: nindx
-    real(r8), parameter :: eps = 1.e-14_r8
+    real(r8), parameter :: eps = 1.e-6_r8
     !-----------------------------------------------------------------------
 
     found = .false.
