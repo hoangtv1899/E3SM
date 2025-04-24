@@ -442,12 +442,12 @@ contains
     it(2) = it(1) + 1
     months(1) = kmo + it(1) - 1
     months(2) = kmo + it(2) - 1
-    kyrs(1) = 2000+ kyr
-    kyrs(2) = 2000+ kyr
+    kyrs(1) = kyr
+    kyrs(2) = kyr
     if (months(1) <  1) months(1) = 12
     if (months(2) > 12) then
     	months(2) = 1
-    	kyrs(2) = 2000+ kyr + 1
+    	kyrs(2) = kyr + 1
     end if
     
     do while (kyrs(1) > 2019)
